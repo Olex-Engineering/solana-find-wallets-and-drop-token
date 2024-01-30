@@ -27,7 +27,7 @@ export default function CloseTable() {
             recipient: wallet.adapter.publicKey
         });
         
-        await sendV0Transaction(connection, wallet.adapter.publicKey, wallet, [closeLookupTableInst]);
+        sendV0Transaction(connection, wallet.adapter.publicKey, wallet, [closeLookupTableInst]);
         setIsLoading(false);
     }
 

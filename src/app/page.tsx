@@ -23,6 +23,7 @@ export default function Home() {
   const [loadingLabelMessage, setLoadingLabelMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [heliusApiKey, setHeliusApiKey] = useState('ef34019b-972a-4eb3-9f91-a079c504b73f');
+  
 
   const { connection } = useConnection();
   const { wallet } = useWallet();
@@ -71,31 +72,35 @@ export default function Home() {
         const filteredWallets: string[] = [];
 
         for (let i = 0; i < wallets.length; i++) {
-          const balance = await connection.getBalance(new PublicKey(wallets[i]));
-          const tokenAccounts = await connection.getParsedTokenAccountsByOwner(new PublicKey(wallets[i]), {
-            programId: TOKEN_PROGRAM_ID
-          });
-          
-          const targetTokenAccount = tokenAccounts.value.find((tokenAccount) => tokenAccount.account.data.parsed?.info?.mint === TARGET_TOKEN_MINT_DEFAULT);
-          const USDTTokenAccount = tokenAccounts.value.find((tokenAccount) => tokenAccount.account.data.parsed?.info?.mint === USDT_MINT);
-          const USDCTokenAccount = tokenAccounts.value.find((tokenAccount) => tokenAccount.account.data.parsed?.info?.mint === USDC_MINT);
 
-          const USDCAmount = USDCTokenAccount?.account.data.parsed.info.tokenAmount.uiAmount || 0;
-          const USDTAmount = USDTTokenAccount?.account.data.parsed.info.tokenAmount.uiAmount || 0;
-          const SOLAmount = balance / LAMPORTS_PER_SOL;
+          if (!filteredWallets.includes(wallets[i])
+          && PublicKey.isOnCurve(new PublicKey(wallets[i]))
+          && !walletsToSend.includes(wallets[i])) {
+            const balance = await connection.getBalance(new PublicKey(wallets[i]));
+            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(new PublicKey(wallets[i]), {
+              programId: TOKEN_PROGRAM_ID
+            });
+            
+            const targetTokenAccount = tokenAccounts.value.find((tokenAccount) => tokenAccount.account.data.parsed?.info?.mint === TARGET_TOKEN_MINT_DEFAULT);
+            const USDTTokenAccount = tokenAccounts.value.find((tokenAccount) => tokenAccount.account.data.parsed?.info?.mint === USDT_MINT);
+            const USDCTokenAccount = tokenAccounts.value.find((tokenAccount) => tokenAccount.account.data.parsed?.info?.mint === USDC_MINT);
+  
+            const USDCAmount = USDCTokenAccount?.account.data.parsed.info.tokenAmount.uiAmount || 0;
+            const USDTAmount = USDTTokenAccount?.account.data.parsed.info.tokenAmount.uiAmount || 0;
+            const SOLAmount = balance / LAMPORTS_PER_SOL;
 
-          if (
-            !targetTokenAccount
-            && PublicKey.isOnCurve(new PublicKey(wallets[i]))
-            && !filteredWallets.includes(wallets[i])
-            && !walletsToSend.includes(wallets[i])
-            && (USDCAmount > +walletMinUSDT || USDTAmount > +walletMinUSDT || SOLAmount > +walletMinSOL)) {
-            filteredWallets.push(wallets[i]);
+            if (
+              !targetTokenAccount
+              && PublicKey.isOnCurve(new PublicKey(wallets[i]))
+              && (USDCAmount > +walletMinUSDT || USDTAmount > +walletMinUSDT || SOLAmount > +walletMinSOL)) {
+              filteredWallets.push(wallets[i]);
+            }
           }
         }
 
         walletsToSend = [...walletsToSend, ...filteredWallets];
         console.log(walletsToSend.length);
+        setLoadingLabelMessage(`Fetching accounts - ${walletsToSend.length}`);
       }
     }
 
@@ -156,15 +161,21 @@ export default function Home() {
 
       setLoadingLabelMessage('Sending!');
 
-      // await sendV0Transaction(connection, senderWallet, wallet, createTokenAccountInstructions, [
-      //   lookupTableAccount,
-      // ]);
-
-      // await waitForNewBlock(connection, 1);
-
-      await sendV0Transaction(connection, senderWallet, wallet, [...createTokenAccountInstructions, ...transferInstructions], [
+      let createInstructions = [...createTokenAccountInstructions];
+      while (createInstructions.length) {
+        sendV0Transaction(connection, senderWallet, wallet, createInstructions.splice(0, 8), [
           lookupTableAccount,
-      ]);
+        ]);
+      }
+      await waitForNewBlock(connection, 100);
+      
+      let transferInstructionsToCheck = [...transferInstructions];
+      
+      while (transferInstructionsToCheck.length) {
+        sendV0Transaction(connection, senderWallet, wallet, transferInstructionsToCheck.splice(0, 8), [
+          lookupTableAccount,
+        ]);
+      }
     } catch (error) {
       console.warn(error);
     }
@@ -183,6 +194,7 @@ export default function Home() {
     });
 
     try {
+
       await sendV0Transaction(connection, senderWallet, wallet, [deactivateLookupTableInst]);
       await waitForNewBlock(connection, 513);
       await sendV0Transaction(connection, senderWallet, wallet, [closeLookupTableInst]);
