@@ -11,7 +11,15 @@
   "dependencies": {
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.1.0"
+    "next": "14.1.0",
+    "@nextui-org/react": "^2.2.9",
+    "@solana/spl-token": "^0.3.10",
+    "@solana/wallet-adapter-base": "^0.9.23",
+    "@solana/wallet-adapter-react": "^0.15.35",
+    "@solana/wallet-adapter-react-ui": "^0.9.34",
+    "@solana/wallet-adapter-wallets": "^0.19.24",
+    "@solana/web3.js": "^1.87.6",
+    "framer-motion": "^10.17.6"
   },
   "devDependencies": {
     "typescript": "^5",
